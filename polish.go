@@ -2,99 +2,56 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package polish
+package littlepoland
 
 import (
 	"fmt"
 	"strconv"
 )
 
-type Program struct {
-	maxstack int
-	steps    []Step
-}
-
-func (p Program) Execute() []float64 {
-	stack := make([]float64, 0, p.maxstack)
-	for _, s := range p.steps {
-		stack = s.Execute(stack)
-	}
-	return stack
-}
-
-type Step interface {
-	Execute([]float64) []float64
-}
-
-type BinOp func(float64, float64) float64
-
-func (f BinOp) Execute(stack []float64) []float64 {
-	l := len(stack)
-	stack[l-2] = f(stack[l-2], stack[l-1])
-	return stack[:l-1]
-}
-
-func Add(x, y float64) float64 { return x + y }
-func Sub(x, y float64) float64 { return x - y }
-func Mul(x, y float64) float64 { return x * y }
-func Div(x, y float64) float64 { return x / y }
-
-type Constant float64
-
-func (c Constant) Execute(stack []float64) []float64 {
-	return append(stack, float64(c))
-}
-
-// 3 2 4 + 1 - 6 * /
-
-type ErrStackUnderrun struct {
+type ErrInput struct {
+	Message  string
 	ArgNum   int
 	Arg      string
 	Overflow int
 }
 
-func (e ErrStackUnderrun) Error() string {
-	return fmt.Sprintf("buffer underrun: argument [%d] %q underran the stack to %d", e.ArgNum, e.Arg, e.Overflow)
+func (e ErrInput) Error() string {
+	return fmt.Sprintf("%s: argument [%d] %q underran the stack to %d", e.Message, e.ArgNum, e.Arg, e.Overflow)
 }
 
-func Parse(args []string) (p Program, err error) {
-	var (
-		step          Step
-		size, maxsize int
-		n             float64
-	)
-	steps := make([]Step, len(args))
+func Run(args []string) ([]float64, error) {
+	stack := make([]float64, 0, len(args))
 	for i, str := range args {
-		take, give := 2, 1
+		b := str[0]
+		if b >= '0' && b <= '9' {
+			if n, err := strconv.ParseFloat(str, 64); err != nil {
+				return nil, err
+			} else {
+				stack = append(stack, n)
+			}
+			continue
+		}
+		l := len(stack)
+		if l < 2 {
+			return nil, ErrInput{"stack underrun", i, str, l}
+		}
+		m, n := stack[l-2], stack[l-1]
+		var o float64
 		switch str {
 		case "+":
-			step = BinOp(Add)
+			o = m + n
 		case "-":
-			step = BinOp(Sub)
+			o = m - n
 		case "*":
-			step = BinOp(Mul)
+			o = m * n
 		case "/":
-			step = BinOp(Div)
+			o = m / n
 		default:
-			n, err = strconv.ParseFloat(str, 64)
-			if err != nil {
-				return
-			} else {
-				step, take, give = Constant(n), 0, 1
-			}
+			return nil, ErrInput{"unrecognized operator", i, str, l}
 		}
-		size -= take
-		if size < 0 {
-			err = ErrStackUnderrun{i, str, size}
-			return
-		}
-		size += give
-		if size > maxsize {
-			maxsize = size
-		}
-		steps[i] = step
+		stack[l-2] = o
+		stack = stack[:l-1]
 	}
-	p.maxstack = maxsize
-	p.steps = steps
-	return
+	return stack, nil
 }
