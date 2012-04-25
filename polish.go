@@ -10,14 +10,13 @@ import (
 )
 
 type ErrInput struct {
-	Message  string
-	ArgNum   int
-	Arg      string
-	Overflow int
+	Message string
+	ArgNum  int
+	Arg     string
 }
 
 func (e ErrInput) Error() string {
-	return fmt.Sprintf("%s: argument [%d] %q underran the stack to %d", e.Message, e.ArgNum, e.Arg, e.Overflow)
+	return fmt.Sprintf("argument [%d] %q: %s", e.ArgNum, e.Arg, e.Message)
 }
 
 func Run(args []string) ([]float64, error) {
@@ -34,7 +33,7 @@ func Run(args []string) ([]float64, error) {
 		}
 		l := len(stack)
 		if l < 2 {
-			return nil, ErrInput{"stack underrun", i, str, l}
+			return nil, ErrInput{"stack underrun", i, str}
 		}
 		m, n := stack[l-2], stack[l-1]
 		var o float64
@@ -48,7 +47,7 @@ func Run(args []string) ([]float64, error) {
 		case "/":
 			o = m / n
 		default:
-			return nil, ErrInput{"unrecognized operator", i, str, l}
+			return nil, ErrInput{"unrecognized operator", i, str}
 		}
 		stack[l-2] = o
 		stack = stack[:l-1]
